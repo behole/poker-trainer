@@ -1,21 +1,19 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import PokerTrainingApp from './components/PokerTrainingApp';
 
-// Test element to ensure React is loading
-const TestApp = () => {
-  return (
-    <div style={{ padding: '20px', color: 'white' }}>
-      <h1>Poker Trainer Test</h1>
-      <p>If you can see this, React is working!</p>
-      <PokerTrainingApp />
-    </div>
-  );
-};
+// Get the root element
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Failed to find the root element');
+}
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
+// Create a root
+const root = createRoot(rootElement);
+
+// Render your app
 root.render(
   <React.StrictMode>
-    <TestApp />
+    <PokerTrainingApp />
   </React.StrictMode>
 );
