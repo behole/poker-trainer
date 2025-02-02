@@ -3,11 +3,19 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import PokerTrainingApp from './components/PokerTrainingApp';
 
+// Try to find the root element
 const rootElement = document.getElementById('root');
-const root = createRoot(rootElement);
+console.log('Root element:', rootElement); // Debug log
 
-root.render(
-  <React.StrictMode>
-    <PokerTrainingApp />
-  </React.StrictMode>
-);
+// Create root and render
+try {
+  const root = createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <PokerTrainingApp />
+    </React.StrictMode>
+  );
+  console.log('Render completed');
+} catch (error) {
+  console.error('Error rendering app:', error);
+}
