@@ -1,0 +1,1 @@
+{Our previous React component code}
