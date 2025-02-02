@@ -9,19 +9,27 @@ const PokerTrainingApp = () => {
   
   useEffect(() => {
     const handleNewGameState = (event) => {
+      console.log('New state:', event.detail); // Debug log
       setGameState(event.detail);
     };
     window.addEventListener('newGameState', handleNewGameState);
     
     // Start initial hand
     const initialState = gameManager.startNewHand();
+    console.log('Initial state:', initialState); // Debug log
     setGameState(initialState);
+
+    // Start AI actions if needed
+    if (initialState.activePlayer !== 0) {
+      gameManager.processAIActions();
+    }
     
     return () => window.removeEventListener('newGameState', handleNewGameState);
   }, [gameManager]);
 
   const handleAction = (action, amount = 0) => {
     if (gameState.activePlayer === 0) {
+      console.log('Player action:', action, amount); // Debug log
       const newState = gameManager.handleAction(action, amount);
       setGameState(newState);
     }
@@ -47,10 +55,30 @@ const PokerTrainingApp = () => {
     );
   };
 
+  // Debug component to show game state
+  const DebugInfo = () => (
+    <div className="fixed top-0 right-0 bg-black/80 p-4 text-xs text-white">
+      <div>Phase: {gameState.phase}</div>
+      <div>Active Player: {gameState.activePlayer}</div>
+      <div>Current Bet: ${gameState.currentBet}</div>
+      <div>Button: {gameState.buttonPosition}</div>
+      <button 
+        className="mt-2 px-2 py-1 bg-red-600 rounded"
+        onClick={() => {
+          const newState = gameManager.startNewHand();
+          setGameState(newState);
+        }}
+      >
+        New Hand
+      </button>
+    </div>
+  );
+
   if (!gameState) return <div>Loading...</div>;
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
+      <DebugInfo />
       {/* Player Info */}
       <div className="grid grid-cols-3 gap-4 p-4 bg-gray-800">
         {gameState.players.map(player => (
