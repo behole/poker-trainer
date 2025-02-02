@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/poker-trainer/static/js/main.9e7231fc.js",
+    "index.html": "/poker-trainer/index.html",
+    "main.9e7231fc.js.map": "/poker-trainer/static/js/main.9e7231fc.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.9e7231fc.js"
+  ]
+}
