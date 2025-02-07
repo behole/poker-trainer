@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/poker-trainer/static/css/main.f053cb5a.css",
-    "main.js": "/poker-trainer/static/js/main.be0f14a7.js",
+    "main.css": "/poker-trainer/static/css/main.a27b32d1.css",
+    "main.js": "/poker-trainer/static/js/main.c51199e4.js",
     "index.html": "/poker-trainer/index.html",
-    "main.f053cb5a.css.map": "/poker-trainer/static/css/main.f053cb5a.css.map",
-    "main.be0f14a7.js.map": "/poker-trainer/static/js/main.be0f14a7.js.map"
+    "main.a27b32d1.css.map": "/poker-trainer/static/css/main.a27b32d1.css.map",
+    "main.c51199e4.js.map": "/poker-trainer/static/js/main.c51199e4.js.map"
   },
   "entrypoints": [
-    "static/css/main.f053cb5a.css",
-    "static/js/main.be0f14a7.js"
+    "static/css/main.a27b32d1.css",
+    "static/js/main.c51199e4.js"
   ]
 }
