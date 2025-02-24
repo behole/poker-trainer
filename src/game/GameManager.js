@@ -7,15 +7,19 @@ class GameManager {
     this.actedPlayers = new Set();
     this.lastRaiseAmount = bigBlind;  // Track the last raise amount
     
-    // Initialize players
+    // Initialize players with friendly names
+    const playerNames = ['You', 'Bob', 'Kim', 'Alex', 'Jamie', 'Taylor'];
+    
     this.players = Array(numPlayers).fill(null).map((_, i) => ({
       id: i,
+      name: playerNames[i],
       stack: 1500,
       position: '',  // Will be set in startNewHand
       active: true,
       cards: [],
       bet: 0,
-      totalBet: 0  // Track total amount bet in the hand
+      totalBet: 0,  // Track total amount bet in the hand
+      handRank: null // For storing hand evaluation results
     }));
     
     this.communityCards = [];
@@ -24,6 +28,7 @@ class GameManager {
     this.activePlayer = 0;
     this.phase = 'preflop';
     this.lastAggressor = null;
+    this.winnerMessage = null; // Store information about the winner
     
     // Create initial deck
     this.deck = this.createDeck();
@@ -71,7 +76,8 @@ class GameManager {
       actedPlayers: Array.from(this.actedPlayers),
       smallBlind: this.smallBlind,
       bigBlind: this.bigBlind,
-      lastRaiseAmount: this.lastRaiseAmount
+      lastRaiseAmount: this.lastRaiseAmount,
+      winnerMessage: this.winnerMessage
     };
   }
 
@@ -83,6 +89,7 @@ class GameManager {
     this.phase = 'preflop';
     this.actedPlayers.clear();
     this.lastRaiseAmount = this.bigBlind;
+    this.winnerMessage = null;
     
     this.buttonPosition = (this.buttonPosition + 1) % this.numPlayers;
     
@@ -93,6 +100,7 @@ class GameManager {
       player.bet = 0;
       player.totalBet = 0;
       player.active = true;
+      player.handRank = null;
     });
 
     // Post blinds
@@ -217,12 +225,20 @@ class GameManager {
       // If only one player is left active, they win the pot
       const activePlayers = this.players.filter(p => p.active);
       if (activePlayers.length === 1) {
+        // Set winner message
+        const winner = activePlayers[0];
+        this.winnerMessage = {
+          playerId: winner.id,
+          message: `${winner.name} (${winner.position}) wins $${this.pot} by default - all opponents folded`,
+          handType: null
+        };
+        
         setTimeout(() => {
           // Award pot to remaining player
           activePlayers[0].stack += this.pot;
           const newState = this.startNewHand();
           window.dispatchEvent(new CustomEvent('newGameState', { detail: newState }));
-        }, 1500);
+        }, 3000);
         return this.getGameState();
       }
       
@@ -248,6 +264,119 @@ class GameManager {
     return newState;
   }
 
+  // Evaluate a poker hand and return its rank and type
+  evaluateHand(playerCards, communityCards) {
+    const allCards = [...playerCards, ...communityCards];
+    
+    // For simplicity, we'll just do a basic hand evaluation
+    // In a more complete implementation, we would check for all hand types
+    // and determine the best hand with kickers
+    
+    // Convert card values to numeric values for easier comparison
+    const valueMap = {
+      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8,
+      '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14
+    };
+    
+    // Count occurrences of each value
+    const valueCounts = {};
+    allCards.forEach(card => {
+      const value = card[0];
+      valueCounts[value] = (valueCounts[value] || 0) + 1;
+    });
+    
+    // Check for pairs, trips, quads
+    let pairs = 0;
+    let threeOfAKind = false;
+    let fourOfAKind = false;
+    let handType = "High Card";
+    let handRank = 0;
+    
+    for (const value in valueCounts) {
+      if (valueCounts[value] === 2) pairs++;
+      if (valueCounts[value] === 3) threeOfAKind = true;
+      if (valueCounts[value] === 4) fourOfAKind = true;
+    }
+    
+    // Determine hand type
+    if (fourOfAKind) {
+      handType = "Four of a Kind";
+      handRank = 7;
+    } else if (threeOfAKind && pairs >= 1) {
+      handType = "Full House";
+      handRank = 6;
+    } else if (threeOfAKind) {
+      handType = "Three of a Kind";
+      handRank = 3;
+    } else if (pairs === 2) {
+      handType = "Two Pair";
+      handRank = 2;
+    } else if (pairs === 1) {
+      handType = "Pair";
+      handRank = 1;
+    }
+    
+    // For simplicity, we're skipping flushes, straights, etc.
+    // In a real implementation, we would check for these as well
+    
+    return { 
+      rank: handRank,
+      type: handType
+    };
+  }
+  
+  // Evaluate all hands and determine the winner
+  evaluateHandsAndDetermineWinner() {
+    // Only evaluate active players
+    const activePlayers = this.players.filter(p => p.active);
+    
+    // Evaluate each player's hand
+    activePlayers.forEach(player => {
+      player.handRank = this.evaluateHand(player.cards, this.communityCards);
+    });
+    
+    // Find the highest ranking hand
+    let bestRank = -1;
+    let winners = [];
+    
+    activePlayers.forEach(player => {
+      if (player.handRank.rank > bestRank) {
+        bestRank = player.handRank.rank;
+        winners = [player];
+      } else if (player.handRank.rank === bestRank) {
+        winners.push(player);
+      }
+    });
+    
+    // Handle the pot distribution
+    const potPerWinner = Math.floor(this.pot / winners.length);
+    const remainder = this.pot % winners.length;
+    
+    winners.forEach((winner, index) => {
+      // First winner gets any remainder (can't split pennies)
+      const extraChips = index === 0 ? remainder : 0;
+      winner.stack += potPerWinner + extraChips;
+      console.log(`Player ${winner.id} wins ${potPerWinner + extraChips}`);
+    });
+    
+    // Set winner message
+    if (winners.length === 1) {
+      const winner = winners[0];
+      this.winnerMessage = {
+        playerId: winner.id,
+        message: `${winner.name} (${winner.position}) wins $${this.pot} with ${winner.handRank.type}`,
+        handType: winner.handRank.type
+      };
+    } else {
+      const playerNames = winners.map(w => `${w.name} (${w.position})`).join(' and ');
+      this.winnerMessage = {
+        playerId: winners.map(w => w.id),
+        message: `Split pot of $${this.pot} between ${playerNames} with ${winners[0].handRank.type}`,
+        handType: winners[0].handRank.type
+      };
+    }
+  }
+  
   makeAIDecision() {
     const player = this.players[this.activePlayer];
     const toCall = this.currentBet - player.bet;
@@ -347,11 +476,15 @@ class GameManager {
         this.communityCards.push(this.deck.pop());
         break;
       case 'river':
-        console.log('Hand complete, starting new hand in 2s');
+        console.log('Hand complete, evaluating winner');
+        // Determine winner at showdown
+        this.evaluateHandsAndDetermineWinner();
+        
+        // Delay before starting a new hand
         setTimeout(() => {
           const newState = this.startNewHand();
           window.dispatchEvent(new CustomEvent('newGameState', { detail: newState }));
-        }, 2000);
+        }, 5000);
         return;
     }
 
