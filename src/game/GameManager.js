@@ -83,53 +83,76 @@ class GameManager {
 
   startNewHand() {
     console.log('Starting new hand');
+    
+    // Complete reset of game state
     this.deck = this.createDeck();
     this.communityCards = [];
     this.pot = 0;
     this.phase = 'preflop';
-    this.actedPlayers.clear();
+    this.actedPlayers = new Set(); // Create a completely new Set
     this.lastRaiseAmount = this.bigBlind;
+    this.lastAggressor = null; // Reset last aggressor
     this.winnerMessage = null;
+    this.currentBet = 0; // Reset current bet before setting it again
     
+    // Move button
     this.buttonPosition = (this.buttonPosition + 1) % this.numPlayers;
+    console.log('New button position:', this.buttonPosition);
     
     // Reset all players
     this.players.forEach((player, i) => {
       player.position = this.getPosition(i);
-      player.cards = [];
+      player.cards = []; // Clear cards before dealing new ones
       player.bet = 0;
       player.totalBet = 0;
       player.active = true;
       player.handRank = null;
+      
+      // Add back some chips if player is almost out
+      if (player.stack < this.bigBlind) {
+        console.log('Resetting stack for player', i);
+        player.stack = 1500;
+      }
     });
 
     // Post blinds
     const sbPos = (this.buttonPosition + 1) % this.numPlayers;
     const bbPos = (this.buttonPosition + 2) % this.numPlayers;
     
+    console.log('Blinds positions:', { sbPos, bbPos });
+    
     // Small blind
     this.players[sbPos].stack -= this.smallBlind;
     this.players[sbPos].bet = this.smallBlind;
     this.players[sbPos].totalBet = this.smallBlind;
-    this.actedPlayers.add(sbPos);
+    this.actedPlayers.add(sbPos); // Mark SB as acted
     
     // Big blind
     this.players[bbPos].stack -= this.bigBlind;
     this.players[bbPos].bet = this.bigBlind;
     this.players[bbPos].totalBet = this.bigBlind;
-    this.actedPlayers.add(bbPos);
+    this.actedPlayers.add(bbPos); // Mark BB as acted
     
+    // Set bet and pot
     this.currentBet = this.bigBlind;
     this.pot = this.smallBlind + this.bigBlind;
 
-    // Deal cards
+    // Deal new cards
     this.players.forEach(player => {
-      player.cards = [this.deck.pop(), this.deck.pop()];
+      if (this.deck.length >= 2) {
+        player.cards = [this.deck.pop(), this.deck.pop()];
+      } else {
+        console.error('Error: Not enough cards in deck to deal to player');
+        this.deck = this.createDeck(); // Reshuffle if we somehow run out
+        player.cards = [this.deck.pop(), this.deck.pop()];
+      }
     });
 
-    // Set first to act (UTG)
+    // Set first to act (UTG) - after the big blind
     this.activePlayer = (this.buttonPosition + 3) % this.numPlayers;
     this.lastAggressor = bbPos;
+    
+    console.log('Hand started with active player:', this.activePlayer);
 
     const state = this.getGameState();
     console.log('New hand state:', state);
@@ -151,6 +174,10 @@ class GameManager {
         return true;
         
       case 'call':
+        // If there's no bet to match (checking), it's always valid
+        if (toCall <= 0) return true;
+        
+        // Otherwise, check if player has enough chips to call
         return player.stack >= toCall;
         
       case 'raise':
@@ -167,10 +194,24 @@ class GameManager {
   }
 
   handleAction(action, amount = 0) {
-    console.log('Handling action:', { action, amount, player: this.activePlayer });
+    console.log('Handling action:', { 
+      action, 
+      amount, 
+      player: this.activePlayer,
+      phase: this.phase,
+      communityCards: [...this.communityCards]
+    });
+    
     const player = this.players[this.activePlayer];
     let actionTaken = false;
 
+    // Ensure we're not processing actions for a player who is not active
+    if (!player.active) {
+      console.error('Error: Trying to handle action for inactive player', this.activePlayer);
+      return this.getGameState();
+    }
+    
+    // Validate action
     if (!this.validateAction(action, amount)) {
       console.log('Invalid action:', { action, amount });
       return this.getGameState();
@@ -184,7 +225,15 @@ class GameManager {
         
       case 'call':
         const callAmount = Math.min(this.currentBet - player.bet, player.stack);
-        if (callAmount >= 0) {
+        
+        // Handle checking (when there's no bet to match)
+        if (callAmount === 0) {
+          console.log('Player is checking (no bet to match)');
+          actionTaken = true;
+        } 
+        // Handle calling (positive bet amount)
+        else if (callAmount > 0) {
+          console.log(`Player is calling ${callAmount}`);
           player.stack -= callAmount;
           player.bet += callAmount;
           player.totalBet += callAmount;
@@ -199,15 +248,29 @@ class GameManager {
         const raiseAmount = amount - player.bet;
         
         if (raiseAmount > 0 && player.stack >= raiseAmount) {
+          // Store the current bet before updating
+          const previousBet = this.currentBet;
+          
           player.stack -= raiseAmount;
           player.bet = amount;
           player.totalBet += raiseAmount;
           this.currentBet = amount;
           this.pot += raiseAmount;
           
+          // Calculate the actual raise amount properly
+          const actualRaiseAmount = amount - previousBet;
+          
+          console.log('Raise details:', {
+            previousBet,
+            amount,
+            raiseAmount,
+            actualRaiseAmount,
+            isAllIn
+          });
+          
           // Only update lastRaiseAmount if it's not an all-in
           if (!isAllIn) {
-            this.lastRaiseAmount = amount - this.currentBet;
+            this.lastRaiseAmount = actualRaiseAmount;
           }
           
           this.lastAggressor = this.activePlayer;
@@ -250,7 +313,11 @@ class GameManager {
       this.activePlayer = nextPlayer;
       console.log('Next player:', this.activePlayer);
 
-      if (this.isBettingRoundComplete()) {
+      // Check if the betting round is complete after a player action
+      const roundComplete = this.isBettingRoundComplete();
+      console.log('Round complete check result:', roundComplete);
+      
+      if (roundComplete) {
         console.log('Betting round complete, moving to next phase');
         this.moveToNextPhase();
       } else if (this.activePlayer !== 0) {
@@ -406,14 +473,50 @@ class GameManager {
   }
 
   processAIActions() {
-    if (this.activePlayer === 0 || this.isBettingRoundComplete()) {
-      console.log('Skipping AI action - human turn or round complete');
+    // Safety check: make sure we don't process AI actions if the game is waiting for a human
+    if (this.activePlayer === 0) {
+      console.log('Skipping AI action - human turn');
       return;
+    }
+    
+    // Safety check: make sure we don't process AI actions if the betting round is complete
+    if (this.isBettingRoundComplete()) {
+      console.log('Skipping AI action - betting round already complete');
+      return;
+    }
+    
+    // Safety check: make sure activePlayer is valid
+    if (this.activePlayer < 0 || this.activePlayer >= this.players.length) {
+      console.error('Error: Invalid active player index:', this.activePlayer);
+      return;
+    }
+    
+    // Safety check: make sure active player is actually active
+    if (!this.players[this.activePlayer].active) {
+      console.error('Error: Current active player is not active:', this.activePlayer);
+      
+      // Try to fix the active player
+      let nextActivePlayer = -1;
+      for (let i = 0; i < this.players.length; i++) {
+        if (this.players[i].active) {
+          nextActivePlayer = i;
+          break;
+        }
+      }
+      
+      if (nextActivePlayer >= 0) {
+        console.log('Correcting active player to:', nextActivePlayer);
+        this.activePlayer = nextActivePlayer;
+      } else {
+        console.error('No active players found, can\'t continue game');
+        return;
+      }
     }
 
     console.log('Processing AI action for player', this.activePlayer);
     const decision = this.makeAIDecision();
     console.log('AI decision:', decision);
+    
     const state = this.handleAction(decision.action, decision.amount);
     window.dispatchEvent(new CustomEvent('newGameState', { detail: state }));
   }
@@ -426,34 +529,38 @@ class GameManager {
       return true;
     }
     
-    // Check if all active players have acted
-    const activePlayersActed = activePlayers.every(p => 
-      this.actedPlayers.has(p.id)
+    // Check if all active players have acted (using correct player ID reference)
+    const activePlayersActed = activePlayers.every(player => 
+      this.actedPlayers.has(player.id)
     );
     
     // Check if all active players have matched the current bet or are all-in
-    const allBetsMatched = activePlayers.every(p => 
-      p.bet === this.currentBet || p.stack === 0
+    const allBetsMatched = activePlayers.every(player => 
+      player.bet === this.currentBet || player.stack === 0
     );
     
-    // Check if we've returned to the last aggressor
+    // Only proceed if there's a last aggressor and all players have acted
     const backToAggressor = this.lastAggressor !== null && 
-      this.activePlayer === this.lastAggressor;
+      this.activePlayer === this.lastAggressor && activePlayersActed;
     
     console.log('Checking betting round completion:', {
       activePlayers: activePlayers.length,
       activePlayersActed,
       allBetsMatched,
+      lastAggressor: this.lastAggressor,
+      activePlayer: this.activePlayer,
       backToAggressor,
       currentBet: this.currentBet,
-      bets: activePlayers.map(p => p.bet)
+      bets: activePlayers.map(p => ({ id: p.id, bet: p.bet })),
+      actedPlayers: Array.from(this.actedPlayers)
     });
 
-    return (activePlayersActed && allBetsMatched) || backToAggressor;
+    // We need both conditions to be true to complete the round
+    return activePlayersActed && allBetsMatched;
   }
 
   moveToNextPhase() {
-    console.log('Moving to next phase from:', this.phase);
+    console.log('Moving to next phase from:', this.phase, 'Current community cards:', [...this.communityCards]);
     
     // Move all bets to the pot and reset bets
     this.currentBet = 0;
@@ -465,15 +572,33 @@ class GameManager {
     switch(this.phase) {
       case 'preflop':
         this.phase = 'flop';
-        this.communityCards = [this.deck.pop(), this.deck.pop(), this.deck.pop()];
+        // Ensure we're not adding more flop cards if there's already cards (safety check)
+        if (this.communityCards.length === 0) {
+          this.communityCards = [this.deck.pop(), this.deck.pop(), this.deck.pop()];
+          console.log('Dealt flop:', this.communityCards);
+        } else {
+          console.error('Error: Trying to deal flop but community cards already exist:', this.communityCards);
+        }
         break;
       case 'flop':
         this.phase = 'turn';
-        this.communityCards.push(this.deck.pop());
+        // Check we have exactly 3 community cards before adding turn
+        if (this.communityCards.length === 3) {
+          this.communityCards.push(this.deck.pop());
+          console.log('Dealt turn:', this.communityCards[3]);
+        } else {
+          console.error('Error: Trying to deal turn but wrong number of community cards:', this.communityCards);
+        }
         break;
       case 'turn':
         this.phase = 'river';
-        this.communityCards.push(this.deck.pop());
+        // Check we have exactly 4 community cards before adding river
+        if (this.communityCards.length === 4) {
+          this.communityCards.push(this.deck.pop());
+          console.log('Dealt river:', this.communityCards[4]);
+        } else {
+          console.error('Error: Trying to deal river but wrong number of community cards:', this.communityCards);
+        }
         break;
       case 'river':
         console.log('Hand complete, evaluating winner');
@@ -481,7 +606,9 @@ class GameManager {
         this.evaluateHandsAndDetermineWinner();
         
         // Delay before starting a new hand
+        console.log('Scheduling new hand in 5 seconds');
         setTimeout(() => {
+          console.log('Now starting new hand from river completion');
           const newState = this.startNewHand();
           window.dispatchEvent(new CustomEvent('newGameState', { detail: newState }));
         }, 5000);

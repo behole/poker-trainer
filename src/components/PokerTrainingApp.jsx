@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, BookOpen, X } from 'lucide-react';
+import { Settings, BookOpen, X, BarChart, LayoutDashboard, Clock, Sliders, ToggleLeft } from 'lucide-react';
 import GameManager from '../game/GameManager';
 
 const PLAYER_COLORS = {
@@ -12,21 +12,53 @@ const PLAYER_COLORS = {
 };
 
 const PokerTrainingApp = () => {
-  const [activeTools] = useState(['handStrength', 'outs', 'odds']);
+  const [availableTools] = useState([
+    { id: 'handStrength', name: 'Hand Strength', description: 'Shows your current hand strength as a percentage' },
+    { id: 'potOdds', name: 'Pot Odds', description: 'Calculates pot odds and whether they are favorable' },
+    { id: 'outs', name: 'Outs Calculator', description: 'Counts potential cards that could improve your hand' },
+    { id: 'position', name: 'Position Coach', description: 'Advice based on your table position' },
+    { id: 'preflop', name: 'Preflop Guide', description: 'Starting hand recommendations' },
+    { id: 'handHistory', name: 'Hand History', description: 'Track and review your previous hands' },
+    { id: 'equityCalc', name: 'Equity Calculator', description: 'Estimate your chance of winning against opponents' },
+    { id: 'statistics', name: 'Statistics', description: 'Track your play style and tendencies' },
+    { id: 'icm', name: 'ICM Calculator', description: 'Calculate tournament equity' }
+  ]);
+  const [activeTools, setActiveTools] = useState(['handStrength', 'potOdds', 'outs']);
+  const [showToolSettings, setShowToolSettings] = useState(false);
   const [gameManager] = useState(() => new GameManager());
   const [gameState, setGameState] = useState(null);
   const [customRaiseAmount, setCustomRaiseAmount] = useState('');
   const [showRaiseInput, setShowRaiseInput] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [handHistory, setHandHistory] = useState([]);
   
   useEffect(() => {
     const handleNewGameState = (event) => {
       setGameState(event.detail);
       setShowRaiseInput(false);
       setCustomRaiseAmount('');
+      
       // Keep insights visible between betting rounds but hide on new hand
       if (event.detail.winnerMessage) {
         setShowInsights(false);
+        
+        // Add completed hand to history when we have a winner
+        const newHandRecord = {
+          id: handHistory.length + 1,
+          timestamp: new Date().toISOString(),
+          winner: event.detail.winnerMessage.playerId,
+          potSize: event.detail.pot,
+          handType: event.detail.winnerMessage.handType,
+          communityCards: [...event.detail.communityCards],
+          playerCards: event.detail.players.map(p => ({ 
+            id: p.id, 
+            position: p.position,
+            cards: [...p.cards],
+            finalBet: p.totalBet
+          }))
+        };
+        
+        setHandHistory(prev => [...prev, newHandRecord]);
       }
     };
     window.addEventListener('newGameState', handleNewGameState);
@@ -36,7 +68,7 @@ const PokerTrainingApp = () => {
     setGameState(initialState);
     
     return () => window.removeEventListener('newGameState', handleNewGameState);
-  }, []);
+  }, [handHistory]);
 
   const handleAction = (action, amount = 0) => {
     if (gameState.activePlayer === 0) {
@@ -77,7 +109,15 @@ const PokerTrainingApp = () => {
       's': '♠'
     }[suit] || suit;
 
-    const color = suit === 'h' || suit === 'd' ? 'text-red-500' : 'text-black';
+    // European 4-color deck style
+    const colorMap = {
+      'h': 'text-red-500',    // Hearts - Red
+      'd': 'text-blue-500',   // Diamonds - Blue
+      'c': 'text-green-500',  // Clubs - Green
+      's': 'text-black'       // Spades - Black
+    };
+    
+    const color = colorMap[suit] || 'text-black';
     
     return (
       <div className={`w-16 h-24 bg-white rounded flex items-center justify-center text-xl ${color}`}>
@@ -469,18 +509,188 @@ const PokerTrainingApp = () => {
       <div className="p-4 bg-gray-800">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Training Tools</h3>
-          <button className="p-2 bg-blue-600 rounded">
+          <button 
+            className="p-2 bg-blue-600 rounded hover:bg-blue-700"
+            onClick={() => setShowToolSettings(!showToolSettings)}
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
         
-        <div className="grid grid-cols-3 gap-4">
-          {activeTools.map(tool => (
-            <div key={tool} className="p-4 bg-gray-700 rounded">
-              {tool.charAt(0).toUpperCase() + tool.slice(1)}
+        {showToolSettings ? (
+          <div className="bg-gray-700 p-4 rounded-lg mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-semibold">Configure Tools</h4>
+              <button 
+                className="p-1 rounded hover:bg-gray-600" 
+                onClick={() => setShowToolSettings(false)}
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          ))}
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {availableTools.map(tool => (
+                <div 
+                  key={tool.id}
+                  className="flex items-center space-x-2 p-2 hover:bg-gray-600 rounded cursor-pointer"
+                  onClick={() => {
+                    setActiveTools(prev => 
+                      prev.includes(tool.id) 
+                        ? prev.filter(t => t !== tool.id) 
+                        : [...prev, tool.id]
+                    );
+                  }}
+                >
+                  <div className={`w-5 h-5 rounded-sm flex items-center justify-center ${activeTools.includes(tool.id) ? 'bg-blue-500' : 'border border-gray-400'}`}>
+                    {activeTools.includes(tool.id) && <ToggleLeft className="w-4 h-4 text-white" />}
+                  </div>
+                  <div>
+                    <p className="font-medium">{tool.name}</p>
+                    <p className="text-xs text-gray-300">{tool.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {activeTools.map(toolId => {
+              const tool = availableTools.find(t => t.id === toolId);
+              if (!tool) return null;
+              
+              // Render appropriate tool content based on id
+              let icon = <LayoutDashboard className="w-4 h-4 mr-2" />;
+              let content = null;
+              
+              switch(toolId) {
+                case 'handStrength':
+                  icon = <BarChart className="w-4 h-4 mr-2" />;
+                  const strength = calculateHandStrength();
+                  content = (
+                    <div>
+                      <div className="w-full bg-gray-600 rounded-full h-3 mb-2">
+                        <div 
+                          className="h-3 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" 
+                          style={{ width: `${strength.strength}%` }}
+                        ></div>
+                      </div>
+                      <p className={`text-sm ${strength.color}`}>{strength.description}</p>
+                    </div>
+                  );
+                  break;
+                case 'potOdds':
+                  icon = <Sliders className="w-4 h-4 mr-2" />;
+                  const odds = calculatePotOdds();
+                  content = (
+                    <div className="text-sm">
+                      <p><span className="font-semibold">Ratio:</span> {odds.ratio}</p>
+                      <p className={odds.favorable ? 'text-green-400' : 'text-red-400'}>
+                        {odds.favorable ? 'Favorable' : 'Unfavorable'}
+                      </p>
+                    </div>
+                  );
+                  break;
+                case 'outs':
+                  const outsInfo = (() => {
+                    let outsText = "No potential draws";
+                    let outsCount = 0;
+                    
+                    if (gameState && gameState.phase !== 'preflop' && gameState.phase !== 'river') {
+                      const { communityCards } = gameState;
+                      const playerCards = gameState.players[0].cards;
+                      
+                      // Simple flush draw detection
+                      const allCards = [...playerCards, ...communityCards];
+                      const suitCounts = {};
+                      allCards.forEach(card => {
+                        const suit = card[1];
+                        suitCounts[suit] = (suitCounts[suit] || 0) + 1;
+                      });
+                      
+                      for (const suit in suitCounts) {
+                        if (suitCounts[suit] === 4) {
+                          outsCount = 9;
+                          outsText = "Flush draw (9 outs)";
+                          break;
+                        }
+                      }
+                    }
+                    
+                    return { outsText, outsCount };
+                  })();
+                  
+                  content = (
+                    <div className="text-sm">
+                      <p>{outsInfo.outsText}</p>
+                      {outsInfo.outsCount > 0 && (
+                        <p className="text-blue-400">
+                          ~{Math.round(outsInfo.outsCount * (gameState.phase === 'turn' ? 2 : 4))}% to hit
+                        </p>
+                      )}
+                    </div>
+                  );
+                  break;
+                case 'position':
+                  const position = gameState?.players[0]?.position;
+                  const positionInfo = (() => {
+                    if (!position) return { type: 'Unknown', description: 'Position not available' };
+                    
+                    const earlyPositions = ['SB', 'BB', 'UTG'];
+                    const middlePositions = ['MP', 'HJ'];
+                    const latePositions = ['CO', 'BTN'];
+                    
+                    let posType = 'Middle';
+                    let description = 'Play with caution';
+                    
+                    if (earlyPositions.includes(position)) {
+                      posType = 'Early';
+                      description = 'Play tight, premium hands only';
+                    } else if (latePositions.includes(position)) {
+                      posType = 'Late';
+                      description = 'Good stealing opportunity';
+                    }
+                    
+                    return { type: posType, description };
+                  })();
+                  
+                  content = (
+                    <div className="text-sm">
+                      <p><span className="font-semibold">Position:</span> {position} ({positionInfo.type})</p>
+                      <p className="text-gray-300">{positionInfo.description}</p>
+                    </div>
+                  );
+                  break;
+                case 'handHistory':
+                  icon = <Clock className="w-4 h-4 mr-2" />;
+                  content = (
+                    <div className="text-sm">
+                      <p><span className="font-semibold">Hands played:</span> {handHistory.length}</p>
+                      {handHistory.length > 0 && (
+                        <p><span className="font-semibold">Last winner:</span> Player {
+                          typeof handHistory[handHistory.length-1].winner === 'number' 
+                            ? handHistory[handHistory.length-1].winner 
+                            : handHistory[handHistory.length-1].winner[0]
+                        }</p>
+                      )}
+                    </div>
+                  );
+                  break;
+                default:
+                  content = <p className="text-sm text-gray-300">Coming soon</p>;
+              }
+              
+              return (
+                <div key={toolId} className="p-3 bg-gray-700 rounded">
+                  <div className="flex items-center mb-2">
+                    {icon}
+                    <h4 className="font-medium">{tool.name}</h4>
+                  </div>
+                  {content}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
