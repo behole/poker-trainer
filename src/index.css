@@ -1,3 +1,62 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    @apply font-mono;
+  }
+  
+  /* Dark mode theme */
+  .dark {
+    @apply bg-gray-950 text-gray-100;
+  }
+  
+  /* Add primary color accent elements */
+  .dark button {
+    @apply bg-transparent border border-primary hover:bg-primary-900 text-primary hover:text-white transition-all;
+  }
+  
+  .dark a {
+    @apply text-primary hover:text-primary-300 underline;
+  }
+  
+  .dark input, .dark select, .dark textarea {
+    @apply bg-gray-900 border border-gray-700 text-gray-100 focus:border-primary focus:ring-1 focus:ring-primary;
+  }
+}
+
+/* Component styles with outlines instead of solid backgrounds */
+@layer components {
+  .card {
+    @apply border border-gray-700 bg-transparent shadow-none;
+  }
+  
+  .panel {
+    @apply border border-gray-700 bg-transparent rounded-md;
+  }
+  
+  .button-primary {
+    @apply px-4 py-2 border border-primary text-primary hover:bg-primary-900 hover:text-white rounded transition-all;
+  }
+  
+  .button-secondary {
+    @apply px-4 py-2 border border-secondary text-secondary hover:bg-secondary-900 hover:text-white rounded transition-all;
+  }
+  
+  .button-accent {
+    @apply px-4 py-2 border border-accent text-accent hover:bg-accent-900 hover:text-white rounded transition-all;
+  }
+  
+  .button-outline {
+    @apply px-4 py-2 border border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white rounded transition-all;
+  }
+  
+  /* Card styling */
+  .poker-card {
+    @apply w-16 h-24 rounded border border-gray-600 flex items-center justify-center text-xl bg-gray-900;
+  }
+}
+
+/* Import monospace font if needed */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');

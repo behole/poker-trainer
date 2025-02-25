@@ -296,12 +296,11 @@ class GameManager {
           handType: null
         };
         
-        setTimeout(() => {
-          // Award pot to remaining player
-          activePlayers[0].stack += this.pot;
-          const newState = this.startNewHand();
-          window.dispatchEvent(new CustomEvent('newGameState', { detail: newState }));
-        }, 3000);
+        // Award pot to remaining player right away
+        activePlayers[0].stack += this.pot;
+        
+        // Just return the current state with the winner message
+        // No auto-dealing of next hand
         return this.getGameState();
       }
       
@@ -605,13 +604,8 @@ class GameManager {
         // Determine winner at showdown
         this.evaluateHandsAndDetermineWinner();
         
-        // Delay before starting a new hand
-        console.log('Scheduling new hand in 5 seconds');
-        setTimeout(() => {
-          console.log('Now starting new hand from river completion');
-          const newState = this.startNewHand();
-          window.dispatchEvent(new CustomEvent('newGameState', { detail: newState }));
-        }, 5000);
+        // Don't auto-start next hand
+        // Just return the current state with winner information
         return;
     }
 

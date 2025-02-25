@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import PokerTrainingApp from './components/PokerTrainingApp';
+
+// Enable dark mode on initial load
+document.documentElement.classList.add('dark');
 
 // Try to find the root element
 const rootElement = document.getElementById('root');

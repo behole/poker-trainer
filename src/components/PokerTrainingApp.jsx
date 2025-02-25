@@ -3,12 +3,12 @@ import { Settings, BookOpen, X, BarChart, LayoutDashboard, Clock, Sliders, Toggl
 import GameManager from '../game/GameManager';
 
 const PLAYER_COLORS = {
-  0: 'bg-blue-900',    // Human player - blue
-  1: 'bg-red-900',     // AI 1 - red
-  2: 'bg-green-900',   // AI 2 - green
-  3: 'bg-purple-900',  // AI 3 - purple
-  4: 'bg-yellow-900',  // AI 4 - yellow
-  5: 'bg-pink-900'     // AI 5 - pink
+  0: 'border-primary',      // Human player - primary
+  1: 'border-secondary',    // AI 1 - secondary
+  2: 'border-accent',       // AI 2 - accent
+  3: 'border-purple-500',   // AI 3 - purple
+  4: 'border-yellow-500',   // AI 4 - yellow
+  5: 'border-rose-500'      // AI 5 - rose
 };
 
 const PokerTrainingApp = () => {
@@ -31,6 +31,11 @@ const PokerTrainingApp = () => {
   const [showRaiseInput, setShowRaiseInput] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
   const [handHistory, setHandHistory] = useState([]);
+  const [lastCompletedHand, setLastCompletedHand] = useState(null);
+  const [showHandSummary, setShowHandSummary] = useState(false);
+  
+  // Add state for ready-to-deal
+  const [readyToDeal, setReadyToDeal] = useState(true);
   
   useEffect(() => {
     const handleNewGameState = (event) => {
@@ -58,7 +63,13 @@ const PokerTrainingApp = () => {
           }))
         };
         
+        // Store the hand record for display and add to history
+        setLastCompletedHand(newHandRecord);
+        setShowHandSummary(true);
         setHandHistory(prev => [...prev, newHandRecord]);
+        
+        // Set ready for next hand
+        setReadyToDeal(true);
       }
     };
     window.addEventListener('newGameState', handleNewGameState);
@@ -69,6 +80,14 @@ const PokerTrainingApp = () => {
     
     return () => window.removeEventListener('newGameState', handleNewGameState);
   }, [handHistory]);
+  
+  // Function to handle dealing a new hand
+  const handleDealNewHand = () => {
+    setShowHandSummary(false);
+    const newState = gameManager.startNewHand();
+    setGameState(newState);
+    setReadyToDeal(false);
+  };
 
   const handleAction = (action, amount = 0) => {
     if (gameState.activePlayer === 0) {
@@ -114,13 +133,13 @@ const PokerTrainingApp = () => {
       'h': 'text-red-500',    // Hearts - Red
       'd': 'text-blue-500',   // Diamonds - Blue
       'c': 'text-green-500',  // Clubs - Green
-      's': 'text-black'       // Spades - Black
+      's': 'text-white'       // Spades - White
     };
     
-    const color = colorMap[suit] || 'text-black';
+    const color = colorMap[suit] || 'text-white';
     
     return (
-      <div className={`w-16 h-24 bg-white rounded flex items-center justify-center text-xl ${color}`}>
+      <div className={`poker-card ${color}`}>
         {value}{suitSymbol}
       </div>
     );
@@ -253,16 +272,16 @@ const PokerTrainingApp = () => {
   const isPlayerTurn = gameState.activePlayer === 0;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white">
+    <div className="flex flex-col h-screen bg-gray-950 text-white font-mono">
       {/* Player Info */}
-      <div className="grid grid-cols-3 gap-4 p-4 bg-gray-800">
+      <div className="grid grid-cols-3 gap-4 p-4 border-b border-gray-800">
         {gameState.players.map(player => (
           <div 
             key={player.id}
-            className={`p-2 rounded transition-all duration-200 ${
-              player.active ? PLAYER_COLORS[player.id] : 'bg-gray-700 opacity-50'
+            className={`p-2 rounded-md border transition-all duration-200 ${
+              player.active ? `border-${player.id === 0 ? 'primary' : player.id === 1 ? 'secondary' : 'accent'}-500` : 'border-gray-700 opacity-50'
             } ${
-              gameState.activePlayer === player.id ? 'ring-2 ring-yellow-400 shadow-lg transform scale-105' : ''
+              gameState.activePlayer === player.id ? 'ring-1 ring-yellow-400 shadow-md' : ''
             }`}
           >
             <div className="flex justify-between">
@@ -281,12 +300,12 @@ const PokerTrainingApp = () => {
       </div>
 
       {/* Game Play */}
-      <div className="flex-1 p-4 bg-gray-900">
+      <div className="flex-1 p-4 bg-gray-950">
         <div className="flex justify-between mb-4">
-          <div className="text-xl">Pot: ${gameState.pot}</div>
-          <div className="text-lg">Phase: {gameState.phase}</div>
+          <div className="text-xl border-b border-primary pb-1">Pot: ${gameState.pot}</div>
+          <div className="text-lg border-b border-secondary pb-1">Phase: {gameState.phase}</div>
           <button 
-            className="flex items-center px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+            className="button-primary flex items-center"
             onClick={() => setShowInsights(!showInsights)}
           >
             <BookOpen className="w-4 h-4 mr-2" />
@@ -295,22 +314,75 @@ const PokerTrainingApp = () => {
         </div>
         
         {gameState.winnerMessage && (
-          <div className={`py-3 px-4 mb-4 text-center text-white font-semibold 
-            ${PLAYER_COLORS[typeof gameState.winnerMessage.playerId === 'number' 
-              ? gameState.winnerMessage.playerId 
-              : gameState.winnerMessage.playerId[0]]} 
-            rounded-lg shadow-lg animate-pulse`}>
+          <div className={`py-3 px-4 mb-2 text-center font-semibold border 
+            ${typeof gameState.winnerMessage.playerId === 'number' 
+              ? (gameState.winnerMessage.playerId === 0 ? 'border-primary text-primary' : 
+                 gameState.winnerMessage.playerId === 1 ? 'border-secondary text-secondary' : 
+                 'border-accent text-accent') 
+              : 'border-primary text-primary'} 
+            rounded-md shadow-md animate-pulse`}>
             {gameState.winnerMessage.message}
+          </div>
+        )}
+        
+        {showHandSummary && lastCompletedHand && (
+          <div className="mb-4 border border-gray-700 rounded-md p-3 bg-gray-900/50">
+            <h3 className="text-lg font-semibold text-secondary border-b border-gray-700 pb-1 mb-2">Hand Summary</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border-r border-gray-700 pr-3">
+                <p><span className="text-gray-400">Pot:</span> ${lastCompletedHand.potSize}</p>
+                <p><span className="text-gray-400">Hand Type:</span> {lastCompletedHand.handType}</p>
+                <p><span className="text-gray-400">Winner:</span> Player {
+                  typeof lastCompletedHand.winner === 'number' 
+                    ? lastCompletedHand.winner 
+                    : lastCompletedHand.winner[0]
+                }</p>
+              </div>
+              <div>
+                <p className="text-gray-400 mb-1">Player Stats:</p>
+                <div className="text-sm space-y-1">
+                  {lastCompletedHand.playerCards
+                    .filter(p => p.cards && p.cards.length > 0)
+                    .map(player => (
+                      <p key={player.id}>
+                        <span className={`${PLAYER_COLORS[player.id]} px-1`}>
+                          Player {player.id}
+                        </span>: 
+                        {player.cards.map(c => c[0] + c[1]).join(' ')} 
+                        (${player.finalBet})
+                      </p>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-3">
+              <button 
+                className="text-xs text-gray-400 hover:text-white border border-gray-700 rounded px-2 py-1"
+                onClick={() => setShowHandSummary(false)}
+              >
+                Hide Summary
+              </button>
+              
+              {readyToDeal && (
+                <button 
+                  className="button-primary px-6 py-2 flex items-center"
+                  onClick={handleDealNewHand}
+                >
+                  Deal Next Hand
+                </button>
+              )}
+            </div>
           </div>
         )}
         
         <div className="flex flex-col items-center space-y-4">
           {showInsights && (
-            <div className="w-full bg-gray-800 rounded-lg p-4 shadow-lg mb-4 relative">
+            <div className="w-full border border-gray-700 rounded-md p-4 mb-4 relative">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-bold">Insights</h3>
+                <h3 className="text-xl font-bold text-primary">Insights</h3>
                 <button 
-                  className="p-1 rounded hover:bg-gray-700" 
+                  className="p-1 border border-gray-700 rounded-full hover:border-gray-500" 
                   onClick={() => setShowInsights(false)}
                 >
                   <X className="w-5 h-5" />
@@ -318,30 +390,34 @@ const PokerTrainingApp = () => {
               </div>
               
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-gray-700 p-3 rounded">
-                  <h4 className="font-semibold mb-1">Hand Strength</h4>
+                <div className="panel p-3">
+                  <h4 className="font-semibold mb-1 text-primary">Hand Strength</h4>
                   {(() => {
                     const strength = calculateHandStrength();
                     return (
                       <div>
                         <div className="flex items-center">
-                          <div className="w-full bg-gray-600 rounded-full h-4">
+                          <div className="w-full bg-transparent border border-gray-700 rounded-full h-4">
                             <div 
-                              className="h-4 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" 
+                              className="h-3.5 rounded-full bg-gradient-to-r from-primary-900 via-secondary-800 to-accent-900" 
                               style={{ width: `${strength.strength}%` }}
                             ></div>
                           </div>
                           <span className="ml-2 font-bold">{strength.strength}%</span>
                         </div>
-                        <p className={`mt-1 ${strength.color}`}>{strength.description}</p>
-                        <p className="text-sm text-gray-300 mt-1">Current: {strength.handType}</p>
+                        <p className={`mt-1 ${
+                          strength.strength > 70 ? 'text-accent' : 
+                          strength.strength > 40 ? 'text-secondary' : 
+                          'text-primary'
+                        }`}>{strength.description}</p>
+                        <p className="text-sm text-gray-400 mt-1">Current: {strength.handType}</p>
                       </div>
                     );
                   })()}
                 </div>
                 
-                <div className="bg-gray-700 p-3 rounded">
-                  <h4 className="font-semibold mb-1">Pot Odds & Outs</h4>
+                <div className="panel p-3">
+                  <h4 className="font-semibold mb-1 text-secondary">Pot Odds & Outs</h4>
                   {(() => {
                     const odds = calculatePotOdds();
                     
@@ -400,17 +476,17 @@ const PokerTrainingApp = () => {
                     return (
                       <div>
                         <p className="font-bold">{odds.ratio} (Call ${gameState.currentBet - gameState.players[0].bet})</p>
-                        <p className={odds.favorable ? 'text-green-400' : 'text-red-400'}>
+                        <p className={odds.favorable ? 'text-accent' : 'text-primary'}>
                           {odds.favorable ? 'Favorable odds' : 'Unfavorable odds'}
                         </p>
-                        <p className="text-sm text-gray-300 mt-1">Need {odds.odds}% chance to win</p>
-                        <div className="mt-2 border-t border-gray-600 pt-1">
+                        <p className="text-sm text-gray-400 mt-1">Need {odds.odds}% chance to win</p>
+                        <div className="mt-2 border-t border-gray-800 pt-1">
                           <p className="text-sm font-semibold">Outs: {outsCount > 0 ? 
-                            <span className="text-blue-400">{outsText}</span> : 
-                            <span className="text-gray-400">{outsText}</span>}
+                            <span className="text-secondary">{outsText}</span> : 
+                            <span className="text-gray-500">{outsText}</span>}
                           </p>
                           {outsCount > 0 && (
-                            <p className="text-xs text-gray-300">
+                            <p className="text-xs text-gray-400">
                               ~{Math.round(outsCount * (gameState.phase === 'turn' ? 2 : 4))}% to hit on next card
                             </p>
                           )}
@@ -421,12 +497,12 @@ const PokerTrainingApp = () => {
                 </div>
               </div>
               
-              <div className="bg-gray-700 p-3 rounded">
-                <h4 className="font-semibold mb-1">Advice</h4>
+              <div className="panel p-3">
+                <h4 className="font-semibold mb-1 text-accent">Advice</h4>
                 {gameState.activePlayer === 0 ? (
-                  <p className="text-yellow-300">{getAdvice()}</p>
+                  <p className="text-white">{getAdvice()}</p>
                 ) : (
-                  <p className="text-gray-400">Waiting for your turn...</p>
+                  <p className="text-gray-500">Waiting for your turn...</p>
                 )}
               </div>
             </div>
@@ -444,17 +520,28 @@ const PokerTrainingApp = () => {
             ))}
           </div>
           
-          <div className="flex flex-col items-center space-y-4 mt-8 w-full max-w-md">
-            <div className="flex space-x-4 w-full justify-center">
+          {readyToDeal && !showHandSummary && gameState.winnerMessage && (
+            <div className="mt-8">
               <button 
-                className="px-6 py-2 bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 min-w-[100px]"
+                className="button-primary px-8 py-3 text-lg"
+                onClick={handleDealNewHand}
+              >
+                Deal Next Hand
+              </button>
+            </div>
+          )}
+          
+          <div className="flex flex-col items-center space-y-4 mt-8 w-full max-w-md">
+            <div className="flex space-x-6 w-full justify-center">
+              <button 
+                className="px-6 py-2 border border-primary text-primary rounded hover:bg-primary-900 hover:text-white disabled:opacity-50 min-w-[100px] transition-all"
                 onClick={() => handleAction('fold')}
                 disabled={!isPlayerTurn}
               >
                 FOLD
               </button>
               <button 
-                className="px-6 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 min-w-[100px]"
+                className="px-6 py-2 border border-secondary text-secondary rounded hover:bg-secondary-900 hover:text-white disabled:opacity-50 min-w-[100px] transition-all"
                 onClick={() => handleAction('call')}
                 disabled={!isPlayerTurn || !canCall}
               >
@@ -463,7 +550,7 @@ const PokerTrainingApp = () => {
                   'CHECK'}
               </button>
               <button 
-                className="px-6 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 min-w-[100px]"
+                className="px-6 py-2 border border-accent text-accent rounded hover:bg-accent-900 hover:text-white disabled:opacity-50 min-w-[100px] transition-all"
                 onClick={() => setShowRaiseInput(!showRaiseInput)}
                 disabled={!isPlayerTurn || !canRaise}
               >
@@ -472,29 +559,29 @@ const PokerTrainingApp = () => {
             </div>
 
             {showRaiseInput && (
-              <div className="flex space-x-2 items-center bg-gray-800 p-2 rounded w-full">
+              <div className="flex space-x-2 items-center border border-gray-700 p-3 rounded-md w-full">
                 <button 
-                  className="px-4 py-2 bg-yellow-600 rounded hover:bg-yellow-700"
+                  className="px-4 py-2 border border-secondary text-secondary rounded hover:bg-secondary-900 hover:text-white transition-all"
                   onClick={() => handleAction('raise', calculateMinRaise())}
                 >
                   Min (${calculateMinRaise()})
                 </button>
                 <input
                   type="text"
-                  className="px-3 py-2 rounded bg-gray-700 text-white w-24"
+                  className="px-3 py-2 rounded border border-gray-700 bg-gray-900 text-white w-24 focus:border-primary"
                   value={customRaiseAmount}
                   onChange={handleRaiseInputChange}
                   placeholder="Amount"
                 />
                 <button 
-                  className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
+                  className="px-4 py-2 border border-accent text-accent rounded hover:bg-accent-900 hover:text-white transition-all"
                   onClick={handleCustomRaise}
                   disabled={!customRaiseAmount || parseInt(customRaiseAmount) < calculateMinRaise()}
                 >
                   Raise
                 </button>
                 <button 
-                  className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
+                  className="px-4 py-2 border border-primary text-primary rounded hover:bg-primary-900 hover:text-white transition-all"
                   onClick={() => handleAction('raise', currentPlayer.stack)}
                 >
                   All-in (${currentPlayer.stack})
@@ -506,11 +593,11 @@ const PokerTrainingApp = () => {
       </div>
 
       {/* Training Tools */}
-      <div className="p-4 bg-gray-800">
+      <div className="p-4 border-t border-gray-800">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Training Tools</h3>
+          <h3 className="text-lg font-semibold text-secondary">Training Tools</h3>
           <button 
-            className="p-2 bg-blue-600 rounded hover:bg-blue-700"
+            className="p-2 border border-secondary text-secondary rounded-full hover:bg-secondary-900 hover:text-white transition-all"
             onClick={() => setShowToolSettings(!showToolSettings)}
           >
             <Settings className="w-4 h-4" />
@@ -518,11 +605,11 @@ const PokerTrainingApp = () => {
         </div>
         
         {showToolSettings ? (
-          <div className="bg-gray-700 p-4 rounded-lg mb-4">
+          <div className="border border-gray-700 p-4 rounded-md mb-4">
             <div className="flex justify-between items-center mb-3">
-              <h4 className="font-semibold">Configure Tools</h4>
+              <h4 className="font-semibold text-secondary">Configure Tools</h4>
               <button 
-                className="p-1 rounded hover:bg-gray-600" 
+                className="p-1 border border-gray-700 rounded-full hover:border-gray-500" 
                 onClick={() => setShowToolSettings(false)}
               >
                 <X className="w-4 h-4" />
@@ -532,7 +619,7 @@ const PokerTrainingApp = () => {
               {availableTools.map(tool => (
                 <div 
                   key={tool.id}
-                  className="flex items-center space-x-2 p-2 hover:bg-gray-600 rounded cursor-pointer"
+                  className="flex items-center space-x-2 p-2 hover:bg-gray-900 border border-transparent hover:border-gray-700 rounded-md cursor-pointer transition-all"
                   onClick={() => {
                     setActiveTools(prev => 
                       prev.includes(tool.id) 
@@ -541,12 +628,12 @@ const PokerTrainingApp = () => {
                     );
                   }}
                 >
-                  <div className={`w-5 h-5 rounded-sm flex items-center justify-center ${activeTools.includes(tool.id) ? 'bg-blue-500' : 'border border-gray-400'}`}>
-                    {activeTools.includes(tool.id) && <ToggleLeft className="w-4 h-4 text-white" />}
+                  <div className={`w-5 h-5 rounded-sm flex items-center justify-center ${activeTools.includes(tool.id) ? 'border border-secondary text-secondary' : 'border border-gray-600'}`}>
+                    {activeTools.includes(tool.id) && <ToggleLeft className="w-4 h-4" />}
                   </div>
                   <div>
                     <p className="font-medium">{tool.name}</p>
-                    <p className="text-xs text-gray-300">{tool.description}</p>
+                    <p className="text-xs text-gray-400">{tool.description}</p>
                   </div>
                 </div>
               ))}
@@ -564,33 +651,38 @@ const PokerTrainingApp = () => {
               
               switch(toolId) {
                 case 'handStrength':
-                  icon = <BarChart className="w-4 h-4 mr-2" />;
+                  icon = <BarChart className="w-4 h-4 mr-2 text-primary" />;
                   const strength = calculateHandStrength();
                   content = (
                     <div>
-                      <div className="w-full bg-gray-600 rounded-full h-3 mb-2">
+                      <div className="w-full bg-transparent border border-gray-700 rounded-full h-3 mb-2">
                         <div 
-                          className="h-3 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500" 
+                          className="h-2.5 rounded-full bg-gradient-to-r from-primary-900 via-secondary-800 to-accent-900" 
                           style={{ width: `${strength.strength}%` }}
                         ></div>
                       </div>
-                      <p className={`text-sm ${strength.color}`}>{strength.description}</p>
+                      <p className={`text-sm ${
+                        strength.strength > 70 ? 'text-accent' : 
+                        strength.strength > 40 ? 'text-secondary' : 
+                        'text-primary'
+                      }`}>{strength.description}</p>
                     </div>
                   );
                   break;
                 case 'potOdds':
-                  icon = <Sliders className="w-4 h-4 mr-2" />;
+                  icon = <Sliders className="w-4 h-4 mr-2 text-secondary" />;
                   const odds = calculatePotOdds();
                   content = (
                     <div className="text-sm">
                       <p><span className="font-semibold">Ratio:</span> {odds.ratio}</p>
-                      <p className={odds.favorable ? 'text-green-400' : 'text-red-400'}>
+                      <p className={odds.favorable ? 'text-accent' : 'text-primary'}>
                         {odds.favorable ? 'Favorable' : 'Unfavorable'}
                       </p>
                     </div>
                   );
                   break;
                 case 'outs':
+                  icon = <Sliders className="w-4 h-4 mr-2 text-accent" />;
                   const outsInfo = (() => {
                     let outsText = "No potential draws";
                     let outsCount = 0;
@@ -623,7 +715,7 @@ const PokerTrainingApp = () => {
                     <div className="text-sm">
                       <p>{outsInfo.outsText}</p>
                       {outsInfo.outsCount > 0 && (
-                        <p className="text-blue-400">
+                        <p className="text-secondary">
                           ~{Math.round(outsInfo.outsCount * (gameState.phase === 'turn' ? 2 : 4))}% to hit
                         </p>
                       )}
@@ -631,6 +723,7 @@ const PokerTrainingApp = () => {
                   );
                   break;
                 case 'position':
+                  icon = <LayoutDashboard className="w-4 h-4 mr-2 text-accent" />;
                   const position = gameState?.players[0]?.position;
                   const positionInfo = (() => {
                     if (!position) return { type: 'Unknown', description: 'Position not available' };
@@ -656,12 +749,12 @@ const PokerTrainingApp = () => {
                   content = (
                     <div className="text-sm">
                       <p><span className="font-semibold">Position:</span> {position} ({positionInfo.type})</p>
-                      <p className="text-gray-300">{positionInfo.description}</p>
+                      <p className="text-gray-400">{positionInfo.description}</p>
                     </div>
                   );
                   break;
                 case 'handHistory':
-                  icon = <Clock className="w-4 h-4 mr-2" />;
+                  icon = <Clock className="w-4 h-4 mr-2 text-primary" />;
                   content = (
                     <div className="text-sm">
                       <p><span className="font-semibold">Hands played:</span> {handHistory.length}</p>
@@ -676,11 +769,11 @@ const PokerTrainingApp = () => {
                   );
                   break;
                 default:
-                  content = <p className="text-sm text-gray-300">Coming soon</p>;
+                  content = <p className="text-sm text-gray-400">Coming soon</p>;
               }
               
               return (
-                <div key={toolId} className="p-3 bg-gray-700 rounded">
+                <div key={toolId} className="p-3 border border-gray-700 rounded-md hover:border-gray-600 transition-all">
                   <div className="flex items-center mb-2">
                     {icon}
                     <h4 className="font-medium">{tool.name}</h4>
